@@ -21,7 +21,7 @@ public class CommandHelloWorld extends HystrixCommand<String> {
 
 	@Override
 	protected String run() throws Exception {
-		Thread.sleep(100L);
+		Thread.sleep(1L);
 		return "Hello " + name + "\tThread:" + Thread.currentThread().getName();
 	}
 
@@ -59,7 +59,7 @@ public class CommandHelloWorld extends HystrixCommand<String> {
 			e.printStackTrace();
 		}
 		
-	
+		//注册异步事件回调执行
 		//注册观察者事件拦截
 		Observable<String> fs = new CommandHelloWorld("World").observe();
 		//注册结果回调
