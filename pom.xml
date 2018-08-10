@@ -48,12 +48,20 @@
 			<artifactId>jedis</artifactId>
 			<version>2.9.0</version>
 		</dependency>
-		
+
 		<!-- https://mvnrepository.com/artifact/com.esotericsoftware/kryo -->
 		<dependency>
 			<groupId>com.esotericsoftware</groupId>
 			<artifactId>kryo</artifactId>
 			<version>4.0.0</version>
+		</dependency>
+
+	
+
+		<dependency>
+			<groupId>org.simplejavamail</groupId>
+			<artifactId>simple-java-mail</artifactId>
+			<version>5.0.3</version>
 		</dependency>
 
 
