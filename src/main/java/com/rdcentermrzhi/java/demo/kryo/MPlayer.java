@@ -1,4 +1,4 @@
-package com.rdcentermrzhi.java.demo.kryo.kyro;
+package com.rdcentermrzhi.java.demo.kryo;
 
 public class MPlayer{
 	private String name;

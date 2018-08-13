@@ -1,4 +1,4 @@
-package com.rdcentermrzhi.java.demo.kryo.kyro;
+package com.rdcentermrzhi.java.demo.kryo;
 
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -7,6 +7,11 @@ import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
 
+/**
+ * 序列化编解码的对象 包信息不能变
+ * @author 
+ *
+ */
 public class KryoSerializationUtils {
 
 

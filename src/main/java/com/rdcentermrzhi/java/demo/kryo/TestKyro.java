@@ -1,4 +1,4 @@
-package com.rdcentermrzhi.java.demo.kryo.kyro;
+package com.rdcentermrzhi.java.demo.kryo;
 
 import java.util.ArrayList;
 import java.util.List;
