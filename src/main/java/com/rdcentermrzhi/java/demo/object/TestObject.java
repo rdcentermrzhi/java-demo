@@ -11,11 +11,13 @@ public class TestObject {
 		Student st = new Student("abc",1212);
 		
 		Student st2 =  st;
-		
-		
 		st2.setName("122122");
 		System.out.println(st2);
 		mdifyAge(st2);
+		System.out.println(st2);
+		
+		//类似于c++ 一级指针 方法传递时不能修改指针指向， 改变指针需要传入指针的地址  
+		mdifyObject(st2);
 		System.out.println(st2);
 		
 	}
@@ -28,6 +30,9 @@ public class TestObject {
 		st.setAge(st.getAge() + 10);
 	}
 	
-	
+	public static void mdifyObject(Student st) {
+	     Student sn = new Student("xxx",101);
+	     st = sn;
+	}
 	
 }
