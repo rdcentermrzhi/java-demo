@@ -43,7 +43,7 @@ public class Mail {
 		 */
 
 		Email email = EmailBuilder.startingBlank().from("Michel Baker", "2675204902@qq.com")
-				.to("Mick", "a41012051@qq.com")
+				.to("Mick", "xxxxxx@aaa.com")
 				.withSubject("My Bakery is finally open!")
 				.withPlainText("121212333").buildEmail();
 
