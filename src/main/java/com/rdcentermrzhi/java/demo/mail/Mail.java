@@ -47,7 +47,7 @@ public class Mail {
 				.withSubject("My Bakery is finally open!")
 				.withPlainText("121212333").buildEmail();
 
-		MailerBuilder.withSMTPServer("smtp.bw30.com", 25, "zhangzhi@bw30.com", "F49usPY3")
+		MailerBuilder.withSMTPServer("smtp.xxx.com", 25, "xxx@bw30.com", "password")
 		.withTransportStrategy(TransportStrategy.SMTP).buildMailer().sendMail(email);
 	}
 }
