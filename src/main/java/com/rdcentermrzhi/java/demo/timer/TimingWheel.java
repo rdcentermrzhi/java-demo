@@ -10,7 +10,7 @@ public class TimingWheel {
 		super();
 		this.tickMs = tickMs;
 		this.wheelSize = wheelSize;
-		this.startMs = startMs;
+		this.startMs_ = startMs;
 		this.taskCounter = taskCounter;
 		this.queue = queue;
 
@@ -20,34 +20,39 @@ public class TimingWheel {
 		}
 
 		interval = tickMs * wheelSize;
-		currentTime = startMs - (startMs % tickMs);
+		currentTime = startMs_ - (startMs_ % tickMs);
+		
+		System.out.println("TimingWheel-currentTime:" + currentTime);
 	}
 
-	private Long tickMs;
-	private Integer wheelSize;
-	private Long startMs;
-	private AtomicInteger taskCounter;
-	private DelayQueue<TimerTaskList> queue;
+	public Long tickMs;
+	public Integer wheelSize;
+	public Long startMs_;
+	public AtomicInteger taskCounter;
+	public DelayQueue<TimerTaskList> queue;
 
 	private Long interval;
 	private TimerTaskList[] buckets;
 
 	private Long currentTime;
 
-	private TimingWheel overflowWheel = null;
+	private volatile TimingWheel overflowWheel = null;
 
 	private void addOverflowWheel() {
-		synchronized (this) {
-			if (overflowWheel == null) {
-				overflowWheel = new TimingWheel(interval, wheelSize, currentTime, taskCounter, queue);
+		/*//在 kafka 改动  采用单例懒汉模式加锁  在外边已经判断 减少函数出入栈
+		if(overflowWheel == null) {*/
+			synchronized (this) {
+				if (overflowWheel == null) {
+					overflowWheel = new TimingWheel(interval, wheelSize, currentTime, taskCounter, queue);
+				}
 			}
-		}
-
+		/*}*/
 	}
 
 	boolean add(TimerTaskEntry timerTaskEntry) {
-		long expiration = timerTaskEntry.getExpirationMs();
-
+		long expiration = timerTaskEntry.expirationMs;
+		System.out.println(expiration +"\t" + currentTime +" \t"  + interval);
+		System.out.println(expiration - (currentTime + interval));
 		if (timerTaskEntry.cancelled()) {
 			// Cancelled
 			return false;
@@ -55,7 +60,8 @@ public class TimingWheel {
 			// Already expired
 			return false;
 		} else if (expiration < currentTime + interval) {
-			// Put in its own bucket
+			
+			// Put in its own bucket 计算该任务放在轮子的什么位置
 			long virtualId = expiration / tickMs;
 			TimerTaskList bucket = buckets[(int) (virtualId % new Long(wheelSize))];
 			bucket.add(timerTaskEntry);

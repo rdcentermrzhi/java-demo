@@ -1,19 +1,21 @@
 package com.rdcentermrzhi.java.demo.timer;
 
+import java.util.Iterator;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 
 import javax.annotation.concurrent.ThreadSafe;
 
 @ThreadSafe
-class TimerTaskList implements Delayed {
+class TimerTaskList implements Delayed, Iterable<TimerTask> {
 
 	public TimerTaskList(AtomicInteger taskCounter) {
 		this.taskCounter = taskCounter;
-		root.setNext(root);
-		root.setPrev(root);
+		root.next = root;
+		root.prev = root;
 	}
 
 	// TimerTaskList forms a doubly linked cyclic list using a dummy root entry
@@ -21,7 +23,7 @@ class TimerTaskList implements Delayed {
 	// root.prev points to the tail
 	private TimerTaskEntry root = new TimerTaskEntry(null, -1);
 
-	private AtomicInteger taskCounter;
+	public AtomicInteger taskCounter;
 
 	private AtomicLong expiration = new AtomicLong(-1L);
 
@@ -31,6 +33,21 @@ class TimerTaskList implements Delayed {
 
 	public Long getExpiration() {
 		return expiration.get();
+	}
+
+	@Override
+	public void forEach(Consumer<? super TimerTask> f) {
+		synchronized (this) {
+			TimerTaskEntry entry = root.next;
+			while (!entry.equals(root)) {
+				TimerTaskEntry nextEntry = entry.next;
+
+				if (!entry.cancelled())
+					f.accept(entry.timerTask);
+
+				entry = nextEntry;
+			}
+		}
 	}
 
 	public void add(TimerTaskEntry timerTaskEntry) {
@@ -43,15 +60,15 @@ class TimerTaskList implements Delayed {
 
 			synchronized (this) {
 				synchronized (timerTaskEntry) {
-					if (timerTaskEntry.getList() == null) {
+					if (timerTaskEntry.list == null) {
 						// put the timer task entry to the end of the list. (root.prev points to the
 						// tail entry)
-						TimerTaskEntry tail = root.getPrev();
-						timerTaskEntry.setNext(root);
-						timerTaskEntry.setPrev(tail);
-						timerTaskEntry.setList(this);
-						tail.setNext(timerTaskEntry);
-						root.setPrev(timerTaskEntry);
+						TimerTaskEntry tail = root.prev;
+						timerTaskEntry.next = root;
+						timerTaskEntry.prev = tail;
+						timerTaskEntry.list = this;
+						tail.next = timerTaskEntry;
+						root.prev = timerTaskEntry;
 						taskCounter.incrementAndGet();
 						done = true;
 					}
@@ -60,40 +77,42 @@ class TimerTaskList implements Delayed {
 		}
 	}
 
+	// Remove the specified timer task entry from this list
 	public void remove(TimerTaskEntry timerTaskEntry) {
 		synchronized (this) {
 			synchronized (timerTaskEntry) {
-				if (timerTaskEntry.getList().equals(this)) {
-					timerTaskEntry.getNext().setPrev(timerTaskEntry.getPrev());
-					timerTaskEntry.getPrev().setNext(timerTaskEntry.getNext());
-					timerTaskEntry.setNext(null);
-					timerTaskEntry.setPrev(null);
-					timerTaskEntry.setList(null);
+				if (timerTaskEntry.list.equals(this)) {
+					timerTaskEntry.next.prev = timerTaskEntry.prev;
+					timerTaskEntry.prev.next = timerTaskEntry.next;
+					timerTaskEntry.next = null;
+					timerTaskEntry.prev = null;
+					timerTaskEntry.list = null;
 					taskCounter.decrementAndGet();
 				}
 			}
 		}
 
 	}
-	
-	
-	  // Remove all task entries and apply the supplied function to each of them
-	  public void  flush(SystemTimer timer){
-	    synchronized(this) {
-	    TimerTaskEntry head = root.getNext();
-	      while (head != root) {
-	        remove(head);
-	        timer.addTimerTaskEntry(head);
-	        head = root.getNext();
-	      }
-	      expiration.set(-1L);
-	    }
-	  }
 
+	// Remove all task entries and apply the supplied function to each of them
+	public void flush(Consumer<TimerTaskEntry> f) {
+		synchronized (this) {
+			TimerTaskEntry head = root.next;
+			while (head != root) {
+				remove(head);
+				//
+				// FunctionInterface
+				// timer.addTimerTaskEntry(head);
+				f.accept(head);
+				head = root.next;
+			}
+			expiration.set(-1L);
+		}
+	}
 
 	@Override
 	public int compareTo(Delayed d) {
-		
+
 		TimerTaskList other = (TimerTaskList) d;
 		if (getExpiration() < other.getExpiration())
 			return -1;
@@ -108,20 +127,28 @@ class TimerTaskList implements Delayed {
 		return unit.convert(Math.max(getExpiration() - System.currentTimeMillis(), 0), TimeUnit.MILLISECONDS);
 	}
 
+	@Override
+	public Iterator<TimerTask> iterator() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
 }
 
 class TimerTaskEntry implements Comparable<TimerTaskEntry> {
-	private volatile TimerTaskList list;
-	private TimerTaskEntry next;
-	private TimerTaskEntry prev;
-	private TimerTask timerTask;
-	private Long expirationMs;
+	public volatile TimerTaskList list;
+	public TimerTaskEntry next;
+	public TimerTaskEntry prev;
+	public TimerTask timerTask;
+	public Long expirationMs;
 
 	public TimerTaskEntry(TimerTask timerTask, long expirationMs) {
 		this.timerTask = timerTask;
 		this.expirationMs = expirationMs;
 		if (timerTask != null)
 			timerTask.setTimerTaskEntry(this);
+		
+		System.out.println("TimerTaskEntry-expirationMs:" + expirationMs);
 	}
 
 	public boolean cancelled() {
@@ -146,48 +173,8 @@ class TimerTaskEntry implements Comparable<TimerTaskEntry> {
 
 	@Override
 	public int compareTo(TimerTaskEntry o) {
-		System.out.println(o.expirationMs);
+		// System.out.println(o.expirationMs);
 		return this.expirationMs.compareTo(o.expirationMs);
-	}
-
-	public TimerTaskList getList() {
-		return list;
-	}
-
-	public void setList(TimerTaskList list) {
-		this.list = list;
-	}
-
-	public TimerTaskEntry getNext() {
-		return next;
-	}
-
-	public void setNext(TimerTaskEntry next) {
-		this.next = next;
-	}
-
-	public TimerTaskEntry getPrev() {
-		return prev;
-	}
-
-	public void setPrev(TimerTaskEntry prev) {
-		this.prev = prev;
-	}
-
-	public TimerTask getTimerTask() {
-		return timerTask;
-	}
-
-	public void setTimerTask(TimerTask timerTask) {
-		this.timerTask = timerTask;
-	}
-
-	public Long getExpirationMs() {
-		return expirationMs;
-	}
-
-	public void setExpirationMs(Long expirationMs) {
-		this.expirationMs = expirationMs;
 	}
 
 }

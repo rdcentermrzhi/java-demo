@@ -6,74 +6,140 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Consumer;
 
-interface Timer {
-	void add(TimerTask timerTask);
+public interface Timer {
+	/**
+	 * Add a new task to this executor. It will be executed after the task's delay
+	 * (beginning from the time of submission)
+	 * 
+	 * @param timerTask
+	 *            the task to add
+	 */
+	default void add(TimerTask timerTask) {
+	}
 
-	boolean advanceClock(Long timeoutMs);
+	/**
+	 * Advance the internal clock, executing any tasks whose expiration has been
+	 * reached within the duration of the passed timeout.
+	 * 
+	 * @param timeoutMs
+	 * @return whether or not any tasks were executed
+	 */
+	default boolean advanceClock(Long timeoutMs) {
+		return false;
+	}
 
-	int size();
+	/**
+	 * Get the number of tasks pending execution
+	 * 
+	 * @return the number of tasks
+	 */
+	default int size() {
+		return 0;
+	}
 
-	void shutdown();
+	/**
+	 * Shutdown the timer service, leaving pending tasks unexecuted
+	 */
+	default void shutdown() {
+	}
 }
 
 class SystemTimer implements Timer {
 
-	private String executorName;
-	private Long tickMs = 1L;
-	private int wheelSize = 20;
-	private Long startMs = System.currentTimeMillis();
+	public String executorName_;
+	public Long tickMs_ = 1L;
+	public int wheelSize_ = 20;
+	public Long startMs_ = System.currentTimeMillis();
 
 	private ExecutorService taskExecutor;
 
-	private DelayQueue<TimerTaskList> delayQueue;
+	private DelayQueue<TimerTaskList> delayQueue = new DelayQueue<>();
 	private AtomicInteger taskCounter = new AtomicInteger(0);
 	private TimingWheel timingWheel;
 
 	private ReentrantReadWriteLock readWriteLock = new ReentrantReadWriteLock();
-	private ReentrantReadWriteLock.ReadLock readLock;
-	private ReentrantReadWriteLock.WriteLock writeLock;
+	private ReentrantReadWriteLock.ReadLock readLock = readWriteLock.readLock();
+	private ReentrantReadWriteLock.WriteLock writeLock = readWriteLock.writeLock();
 
 	public SystemTimer(String executorName) {
-		this.executorName = executorName;
+		
+		this.executorName_ = executorName;
 		taskExecutor = Executors.newFixedThreadPool(1, new ThreadFactory() {
 
 			@Override
 			public Thread newThread(Runnable runnable) {
-				return Utils.newThread("executor-" + executorName, runnable, false);
+				return Utils.newThread("executor-" + executorName_, runnable, false);
 			}
 		});
-		readLock = readWriteLock.readLock();
-		writeLock = readWriteLock.writeLock();
-		timingWheel = new TimingWheel(tickMs, wheelSize, startMs, taskCounter, delayQueue);
+		timingWheel = new TimingWheel(tickMs_, wheelSize_, startMs_, taskCounter, delayQueue);
 	}
+
+	public SystemTimer(String executorName, Long tickMs, int wheelSize) {
+		
+		this.executorName_ = executorName;
+		taskExecutor = Executors.newFixedThreadPool(1, new ThreadFactory() {
+
+			@Override
+			public Thread newThread(Runnable runnable) {
+				return Utils.newThread("executor-" + executorName_, runnable, false);
+			}
+		});
+		wheelSize_ = wheelSize;
+		tickMs_ = tickMs;
+		timingWheel = new TimingWheel(tickMs_, wheelSize_, startMs_, taskCounter, delayQueue);
+		System.out.println("system-startMs:" + startMs_);
+	}
+
+
 
 	@Override
 	public void add(TimerTask timerTask) {
 		readLock.lock();
 		try {
-			addTimerTaskEntry(new TimerTaskEntry(timerTask, timerTask.delayMs + System.currentTimeMillis()));
+			long t = System.currentTimeMillis();
+		
+			long T = timerTask.delayMs + t;
+			System.out.println("TimerTask currentTime:"+ t + "\t" +  timerTask.delayMs); 
+			addTimerTaskEntry(new TimerTaskEntry(timerTask, T));
+			
 		} finally {
 			readLock.unlock();
 		}
 
 	}
 
-	public void addTimerTaskEntry(TimerTaskEntry timerTaskEntry) {
+	private void addTimerTaskEntry(TimerTaskEntry timerTaskEntry) {
 		if (!timingWheel.add(timerTaskEntry)) {
 			// Already expired or cancelled
 			if (!timerTaskEntry.cancelled())
-				taskExecutor.submit(timerTaskEntry.getTimerTask());
+				taskExecutor.submit(timerTaskEntry.timerTask);
 		}
 	}
 
+	private Consumer<TimerTaskEntry> reinsert = new Consumer<TimerTaskEntry>() {
+		@Override
+		public void accept(TimerTaskEntry t) {
+			addTimerTaskEntry(t);
+
+		}
+	};
+
+	/*
+	 * Advances the clock if there is an expired bucket. If there isn't any expired
+	 * bucket when called, waits up to timeoutMs before giving up.
+	 */
 	@Override
 	public boolean advanceClock(Long timeoutMs) {
 		TimerTaskList bucket = null;
 		try {
+			
+			long t1 = System.currentTimeMillis();
 			bucket = delayQueue.poll(timeoutMs, TimeUnit.MILLISECONDS);
+			System.out.println(System.currentTimeMillis() -t1);
+			
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
@@ -82,7 +148,7 @@ class SystemTimer implements Timer {
 			try {
 				while (bucket != null) {
 					timingWheel.advanceClock(bucket.getExpiration());
-					bucket.flush(this);
+					bucket.flush(reinsert);
 					bucket = delayQueue.poll();
 				}
 			} finally {
