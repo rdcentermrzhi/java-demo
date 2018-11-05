@@ -9,8 +9,14 @@ import java.util.function.Consumer;
 
 import javax.annotation.concurrent.ThreadSafe;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.rdcentermrzhi.java.demo.date.TimeUtil;
+
 @ThreadSafe
 class TimerTaskList implements Delayed, Iterable<TimerTask> {
+	private static final Logger logger =  LoggerFactory.getLogger(TimerTaskList.class);
 
 	public TimerTaskList(AtomicInteger taskCounter) {
 		this.taskCounter = taskCounter;
@@ -147,8 +153,6 @@ class TimerTaskEntry implements Comparable<TimerTaskEntry> {
 		this.expirationMs = expirationMs;
 		if (timerTask != null)
 			timerTask.setTimerTaskEntry(this);
-		
-		System.out.println("TimerTaskEntry-expirationMs:" + expirationMs);
 	}
 
 	public boolean cancelled() {
@@ -177,4 +181,10 @@ class TimerTaskEntry implements Comparable<TimerTaskEntry> {
 		return this.expirationMs.compareTo(o.expirationMs);
 	}
 
+	@Override
+	public String toString() {
+		return "TimerTaskEntry [timerTask=" + timerTask + ", expirationMs=" + expirationMs + "]";
+	}
+
+	
 }

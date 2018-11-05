@@ -9,6 +9,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.rdcentermrzhi.java.demo.date.TimeUtil;
+
 public interface Timer {
 	/**
 	 * Add a new task to this executor. It will be executed after the task's delay
@@ -48,6 +53,7 @@ public interface Timer {
 }
 
 class SystemTimer implements Timer {
+	private static final Logger logger = LoggerFactory.getLogger(SystemTimer.class);
 
 	public String executorName_;
 	public Long tickMs_ = 1L;
@@ -65,7 +71,7 @@ class SystemTimer implements Timer {
 	private ReentrantReadWriteLock.WriteLock writeLock = readWriteLock.writeLock();
 
 	public SystemTimer(String executorName) {
-		
+
 		this.executorName_ = executorName;
 		taskExecutor = Executors.newFixedThreadPool(1, new ThreadFactory() {
 
@@ -78,7 +84,7 @@ class SystemTimer implements Timer {
 	}
 
 	public SystemTimer(String executorName, Long tickMs, int wheelSize) {
-		
+
 		this.executorName_ = executorName;
 		taskExecutor = Executors.newFixedThreadPool(1, new ThreadFactory() {
 
@@ -90,21 +96,15 @@ class SystemTimer implements Timer {
 		wheelSize_ = wheelSize;
 		tickMs_ = tickMs;
 		timingWheel = new TimingWheel(tickMs_, wheelSize_, startMs_, taskCounter, delayQueue);
-		System.out.println("system-startMs:" + startMs_);
 	}
-
-
 
 	@Override
 	public void add(TimerTask timerTask) {
 		readLock.lock();
 		try {
-			long t = System.currentTimeMillis();
-		
-			long T = timerTask.delayMs + t;
-			System.out.println("TimerTask currentTime:"+ t + "\t" +  timerTask.delayMs); 
-			addTimerTaskEntry(new TimerTaskEntry(timerTask, T));
-			
+
+			addTimerTaskEntry(new TimerTaskEntry(timerTask, System.currentTimeMillis() + timerTask.delayMs));
+
 		} finally {
 			readLock.unlock();
 		}
@@ -135,11 +135,7 @@ class SystemTimer implements Timer {
 	public boolean advanceClock(Long timeoutMs) {
 		TimerTaskList bucket = null;
 		try {
-			
-			long t1 = System.currentTimeMillis();
 			bucket = delayQueue.poll(timeoutMs, TimeUnit.MILLISECONDS);
-			System.out.println(System.currentTimeMillis() -t1);
-			
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}

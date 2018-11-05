@@ -57,7 +57,7 @@ public class TimerTest {
 		List<Integer> output = new ArrayList<>();
 
 		TreeMap<Integer, CountDownLatch> latches = new TreeMap<>();
-		for (int i = 500; i < 1600 ; i += 500) {
+		for (int i = 5000; i <12000 ; i += 5000) {
 			CountDownLatch latch = new CountDownLatch(1);
 			timer.add(new TestTask(i, i, latch, output));
 			latches.put(i, latch);
@@ -71,13 +71,16 @@ public class TimerTest {
 
 		new Thread(() -> {
 			for(;;) {
-				timer.advanceClock(5L);
+				timer.advanceClock(5000L);
 			}
 		}).start();
 		
-		for (int i = 500; i < 1600 ; i += 500) {
+		
+		//while(timer.advanceClock(6000L)) {};
+		
+		for (int i = 5000; i < 12000 ; i += 5000) {
 			CountDownLatch latch = latches.get(i);
-			assertEquals("output should match", true, latch.await(3, TimeUnit.SECONDS));
+			assertEquals("output should match", true, latch.await(6, TimeUnit.SECONDS));
 		}
 	}
 	

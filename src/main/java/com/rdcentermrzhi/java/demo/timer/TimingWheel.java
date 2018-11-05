@@ -21,8 +21,6 @@ public class TimingWheel {
 
 		interval = tickMs * wheelSize;
 		currentTime = startMs_ - (startMs_ % tickMs);
-		
-		System.out.println("TimingWheel-currentTime:" + currentTime);
 	}
 
 	public Long tickMs;
@@ -51,8 +49,6 @@ public class TimingWheel {
 
 	boolean add(TimerTaskEntry timerTaskEntry) {
 		long expiration = timerTaskEntry.expirationMs;
-		System.out.println(expiration +"\t" + currentTime +" \t"  + interval);
-		System.out.println(expiration - (currentTime + interval));
 		if (timerTaskEntry.cancelled()) {
 			// Cancelled
 			return false;

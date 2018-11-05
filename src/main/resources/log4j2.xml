@@ -60,7 +60,7 @@
 		<logger name="org.springframework" level="INFO"></logger>
 		<logger name="org.mybatis" level="INFO"></logger>
 		<!-- 包含位置信息 includeLocation="true"  不建议开启位置信息  太耗费性能-->
-		<asyncRoot level="info" >
+		<asyncRoot level="info"  includeLocation="true">
 			<AppenderRef ref="RollingRandomAccessFileInfo" />
 			<AppenderRef ref="Console" />
 		</asyncRoot>
