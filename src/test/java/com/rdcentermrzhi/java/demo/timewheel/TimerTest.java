@@ -1,4 +1,4 @@
-package com.rdcentermrzhi.java.demo.timer;
+package com.rdcentermrzhi.java.demo.timewheel;
 
 import static org.junit.Assert.assertEquals;
 
@@ -12,6 +12,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+
+import com.rdcentermrzhi.java.demo.timewheel.Timer;
+import com.rdcentermrzhi.java.demo.timewheel.TimerTask;
 
 public class TimerTest {
 
@@ -110,7 +113,7 @@ class TestTask extends TimerTask {
 	@Override
 	public void run() {
 		
-		System.out.println("##########" + id+ "\t" + System.currentTimeMillis());
+		System.out.println(id+ "\t" + System.currentTimeMillis() + output);
 		if (completed.compareAndSet(false, true)) {
 			synchronized (output) {
 				output.add(id);

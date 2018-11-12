@@ -1,6 +1,9 @@
-package com.rdcentermrzhi.java.demo.timer;
+package com.rdcentermrzhi.java.demo.timewheel;
 
 import java.util.PriorityQueue;
+
+import com.rdcentermrzhi.java.demo.timewheel.Timer;
+import com.rdcentermrzhi.java.demo.timewheel.TimerTask;
 
 public class MockTimer implements Timer{
 	private Timer time = new MockTimer();

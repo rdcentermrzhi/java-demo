@@ -1,275 +1,96 @@
 package com.rdcentermrzhi.java.demo.timewheel;
 
-import java.util.ArrayList;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.DelayQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 
-public class TimingWheel<E> {  
-    
-    private final long tickDuration;  
-    private final int ticksPerWheel;  
-    private volatile int currentTickIndex = 0;  
-      
-    private final CopyOnWriteArrayList<ExpirationListener<E>> expirationListeners = new CopyOnWriteArrayList<ExpirationListener<E>>();  
-    private final ArrayList<Slot<E>> wheel;  
-    private final Map<E, Slot<E>> indicator = new ConcurrentHashMap<E, Slot<E>>();  
-      
-    private final AtomicBoolean shutdown = new AtomicBoolean(false);  
-    private final ReadWriteLock lock = new ReentrantReadWriteLock();  
-    private Thread workerThread;  
-      
-    // ~ -------------------------------------------------------------------------------------------------------------  
-  
-    /** 
-     * Construct a timing wheel. 
-     *  
-     * @param tickDuration 
-     *            tick duration with specified time unit. 
-     * @param ticksPerWheel 
-     * @param timeUnit 
-     */  
-    public TimingWheel(int tickDuration, int ticksPerWheel, TimeUnit timeUnit) {  
-        if (timeUnit == null) {  
-            throw new NullPointerException("unit");  
-        }  
-        if (tickDuration <= 0) {  
-            throw new IllegalArgumentException("tickDuration must be greater than 0: " + tickDuration);  
-        }  
-        if (ticksPerWheel <= 0) {  
-            throw new IllegalArgumentException("ticksPerWheel must be greater than 0: " + ticksPerWheel);  
-        }  
-          
-        this.wheel = new ArrayList<Slot<E>>();  
-        this.tickDuration = TimeUnit.MILLISECONDS.convert(tickDuration, timeUnit);  
-        this.ticksPerWheel = ticksPerWheel + 1;  
-          
-        for (int i = 0; i < this.ticksPerWheel; i++) {  
-            wheel.add(new Slot<E>(i));  
-        }  
-        wheel.trimToSize();  
-          
-        workerThread = new Thread(new TickWorker(), "Timing-Wheel");  
-    }  
-      
-    // ~ -------------------------------------------------------------------------------------------------------------  
-      
-    public void start() {  
-        if (shutdown.get()) {  
-            throw new IllegalStateException("Cannot be started once stopped");  
-        }  
-  
-        if (!workerThread.isAlive()) {  
-            workerThread.start();  
-        }  
-    }  
-      
-    public boolean stop() {  
-        if (!shutdown.compareAndSet(false, true)) {  
-            return false;  
-        }  
-          
-        boolean interrupted = false;  
-        while (workerThread.isAlive()) {  
-            workerThread.interrupt();  
-            try {  
-                workerThread.join(100);  
-            } catch (InterruptedException e) {  
-                interrupted = true;  
-            }  
-        }  
-        if (interrupted) {  
-            Thread.currentThread().interrupt();  
-        }  
-          
-        return true;  
-    }  
-      
-    public void addExpirationListener(ExpirationListener<E> listener) {  
-        expirationListeners.add(listener);  
-    }  
-      
-    public void removeExpirationListener(ExpirationListener<E> listener) {  
-        expirationListeners.remove(listener);  
-    }  
-      
-    /** 
-     * Add a element to {@link TimingWheel} and start to count down its life-time. 
-     *  
-     * @param e 
-     * @return remain time to be expired in millisecond. 
-     */  
-    public long add(E e) {  
-        synchronized(e) {  
-            checkAdd(e);  
-              
-            int previousTickIndex = getPreviousTickIndex();  
-            Slot<E> slot = wheel.get(previousTickIndex);  
-            slot.add(e);  
-            indicator.put(e, slot);  
-              
-            return (ticksPerWheel - 1) * tickDuration;  
-        }  
-    }  
-      
-    private void checkAdd(E e) {  
-        Slot<E> slot = indicator.get(e);  
-        if (slot != null) {  
-            slot.remove(e);  
-        }  
-    }  
-      
-    private int getPreviousTickIndex() {  
-        lock.readLock().lock();  
-        try {  
-            int cti = currentTickIndex;  
-            if (cti == 0) {  
-                return ticksPerWheel - 1;  
-            }  
-              
-            return cti - 1;  
-        } finally {  
-            lock.readLock().unlock();  
-        }  
-    }  
-      
-    /** 
-     * Removes the specified element from timing wheel. 
-     *  
-     * @param e 
-     * @return <tt>true</tt> if this timing wheel contained the specified 
-     *         element 
-     */  
-    public boolean remove(E e) {  
-        synchronized (e) {  
-            Slot<E> slot = indicator.get(e);  
-            if (slot == null) {  
-                return false;  
-            }  
-  
-            indicator.remove(e);  
-            return slot.remove(e) != null;  
-        }  
-    }  
-  
-    private void notifyExpired(int idx) {  
-        Slot<E> slot = wheel.get(idx);  
-        Set<E> elements = slot.elements();  
-        for (E e : elements) {  
-            slot.remove(e);  
-            synchronized (e) {  
-                Slot<E> latestSlot = indicator.get(e);  
-                if (latestSlot.equals(slot)) {  
-                    indicator.remove(e);  
-                }  
-            }  
-            for (ExpirationListener<E> listener : expirationListeners) {  
-                listener.expired(e);  
-            }  
-        }  
-    }  
-      
-    // ~ -------------------------------------------------------------------------------------------------------------  
-       
-    private class TickWorker implements Runnable {  
-  
-        private long startTime;  
-        private long tick;  
-  
-        @Override  
-        public void run() {  
-            startTime = System.currentTimeMillis();  
-            tick = 1;  
-  
-            for (int i = 0; !shutdown.get(); i++) {  
-                if (i == wheel.size()) {  
-                    i = 0;  
-                }  
-                lock.writeLock().lock();  
-                try {  
-                    currentTickIndex = i;  
-                } finally {  
-                    lock.writeLock().unlock();  
-                }  
-                notifyExpired(currentTickIndex);  
-                waitForNextTick();  
-            }  
-        }  
-  
-        private void waitForNextTick() {  
-            for (;;) {  
-                long currentTime = System.currentTimeMillis();  
-                long sleepTime = tickDuration * tick - (currentTime - startTime);  
-  
-                if (sleepTime <= 0) {  
-                    break;  
-                }  
-  
-                try {  
-                    Thread.sleep(sleepTime);  
-                } catch (InterruptedException e) {  
-                    return;  
-                }  
-            }  
-              
-            tick++;  
-        }  
-    }  
-      
-    private static class Slot<E> {  
-          
-        private int id;  
-        private Map<E, E> elements = new ConcurrentHashMap<E, E>();  
-          
-        public Slot(int id) {  
-            this.id = id;  
-        }  
-  
-        public void add(E e) {  
-            elements.put(e, e);  
-        }  
-          
-        public E remove(E e) {  
-            return elements.remove(e);  
-        }  
-          
-        public Set<E> elements() {  
-            return elements.keySet();  
-        }  
-  
-        @Override  
-        public int hashCode() {  
-            final int prime = 31;  
-            int result = 1;  
-            result = prime * result + id;  
-            return result;  
-        }  
-  
-        @Override  
-        public boolean equals(Object obj) {  
-            if (this == obj)  
-                return true;  
-            if (obj == null)  
-                return false;  
-            if (getClass() != obj.getClass())  
-                return false;  
-            @SuppressWarnings("rawtypes")  
-            Slot other = (Slot) obj;  
-            if (id != other.id)  
-                return false;  
-            return true;  
-        }  
-  
-        @Override  
-        public String toString() {  
-            return "Slot [id=" + id + ", elements=" + elements + "]";  
-        }  
-          
-    }  
-      
-}  
+public class TimingWheel {
+
+	public TimingWheel(Long tickMs, Integer wheelSize, Long startMs, AtomicInteger taskCounter,
+			DelayQueue<TimerTaskList> queue) {
+		super();
+		this.tickMs = tickMs;
+		this.wheelSize = wheelSize;
+		this.startMs_ = startMs;
+		this.taskCounter = taskCounter;
+		this.queue = queue;
+
+		buckets = new TimerTaskList[wheelSize];
+		for (int i = 0; i < wheelSize; i++) {
+			buckets[i] = new TimerTaskList(taskCounter);
+		}
+
+		interval = tickMs * wheelSize;
+		currentTime = startMs_ - (startMs_ % tickMs);
+	}
+
+	public Long tickMs;
+	public Integer wheelSize;
+	public Long startMs_;
+	public AtomicInteger taskCounter;
+	public DelayQueue<TimerTaskList> queue;
+
+	private Long interval;
+	private TimerTaskList[] buckets;
+
+	private Long currentTime;
+
+	private volatile TimingWheel overflowWheel = null;
+
+	private void addOverflowWheel() {
+		/*//在 kafka 改动  采用单例懒汉模式加锁  在外边已经判断 减少函数出入栈
+		if(overflowWheel == null) {*/
+			synchronized (this) {
+				if (overflowWheel == null) {
+					overflowWheel = new TimingWheel(interval, wheelSize, currentTime, taskCounter, queue);
+				}
+			}
+		/*}*/
+	}
+
+	boolean add(TimerTaskEntry timerTaskEntry) {
+		long expiration = timerTaskEntry.expirationMs;
+		if (timerTaskEntry.cancelled()) {
+			// Cancelled
+			return false;
+		} else if (expiration < currentTime + tickMs) {
+			// Already expired
+			return false;
+		} else if (expiration < currentTime + interval) {
+			
+			// Put in its own bucket 计算该任务放在轮子的什么位置
+			long virtualId = expiration / tickMs;
+			TimerTaskList bucket = buckets[(int) (virtualId % new Long(wheelSize))];
+			bucket.add(timerTaskEntry);
+
+			// Set the bucket expiration time
+			if (bucket.setExpiration(virtualId * tickMs)) {
+				// The bucket needs to be enqueued because it was an expired bucket
+				// We only need to enqueue the bucket when its expiration time has changed, i.e.
+				// the wheel has advanced
+				// and the previous buckets gets reused; further calls to set the expiration
+				// within the same wheel cycle
+				// will pass in the same value and hence return false, thus the bucket with the
+				// same expiration will not
+				// be enqueued multiple times.
+				queue.offer(bucket);
+			}
+			return true;
+		} else {
+			// Out of the interval. Put it into the parent timer
+			if (overflowWheel == null)
+				addOverflowWheel();
+			return overflowWheel.add(timerTaskEntry);
+		}
+	}
+
+	void advanceClock(Long timeMs) {
+		if (timeMs >= currentTime + tickMs) {
+			currentTime = timeMs - (timeMs % tickMs);
+
+			// Try to advance the clock of the overflow wheel if present
+			if (overflowWheel != null)
+				overflowWheel.advanceClock(currentTime);
+		}
+	}
+
+}

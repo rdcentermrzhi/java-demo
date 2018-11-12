@@ -1,4 +1,4 @@
-package com.rdcentermrzhi.java.demo.timer;
+package com.rdcentermrzhi.java.demo.timewheel;
 
 public abstract class TimerTask implements Runnable {
 

@@ -1,4 +1,4 @@
-package com.rdcentermrzhi.java.demo.timer;
+package com.rdcentermrzhi.java.demo.timewheel;
 
 import java.util.concurrent.DelayQueue;
 import java.util.concurrent.ExecutorService;

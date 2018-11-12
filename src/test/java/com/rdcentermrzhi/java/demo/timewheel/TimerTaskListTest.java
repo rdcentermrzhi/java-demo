@@ -1,4 +1,6 @@
-package com.rdcentermrzhi.java.demo.timer;
+package com.rdcentermrzhi.java.demo.timewheel;
+
+import com.rdcentermrzhi.java.demo.timewheel.TimerTask;
 
 public class TimerTaskListTest extends TimerTask{
 	
