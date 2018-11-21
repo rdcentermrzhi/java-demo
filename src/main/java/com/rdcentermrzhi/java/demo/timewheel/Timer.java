@@ -12,8 +12,6 @@ import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.rdcentermrzhi.java.demo.date.TimeUtil;
-
 public interface Timer {
 	/**
 	 * Add a new task to this executor. It will be executed after the task's delay
