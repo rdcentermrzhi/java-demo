@@ -11,7 +11,9 @@ public class TimeUsDemo {
 		long cuTimeMills = System.currentTimeMillis() * 1000;
 		long nanoTime = System.nanoTime();
 
-		return cuTimeMills + (nanoTime - nanoTime / 1000000L * 1000000L) / 1000L;
+		long x = cuTimeMills + (nanoTime - nanoTime / 1000000L * 1000000L) / 1000L;
 
+		System.out.println(x +"\t" + cuTimeMills);
+		return x;
 	}
 }
